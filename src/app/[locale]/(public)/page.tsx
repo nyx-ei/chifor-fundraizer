@@ -5,7 +5,7 @@ import { PublicDirectoryHeader } from '@/components/kamga/MockupShell';
 import { AssociationRecruitLeadForm } from '@/features/associations/components/AssociationRecruitLeadForm';
 import { PublicDirectoryMap } from '@/features/associations/components/PublicDirectoryMap';
 import { PublicUseLocationButton } from '@/features/associations/components/PublicUseLocationButton';
-import { type PublicAssociationSearchResult,searchPublicAssociations } from '@/features/associations/public-search';
+import { type PublicAssociationSearchResult, searchPublicAssociations } from '@/features/associations/public-search';
 import { Link } from '@/i18n/navigation';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +26,8 @@ type HomePageProps = {
     page?: string;
     q?: string;
     radius?: string;
+    card?: string;
+    language?: string;
     selected?: string;
     view?: string;
     verified?: string;
@@ -46,7 +48,8 @@ const directoryCopy = {
     emptyDescription:
       'The directory is still growing. If you know an RPN association in this area, help us add it - they will be invited to confirm their own listing.',
     filter: 'Filter',
-    languageFilter: 'French or English',
+    languageFilter: 'Primary language',
+    languageFilters: { all: 'All languages', en: 'English', fr: 'French', fr_en: 'French & English' },
     languages: { en: 'English', fr: 'French', fr_en: 'French & English' },
     localizedFallback: (locale: 'en' | 'fr' | 'fr_en') => `Shown in ${locale === 'fr' ? 'French' : locale === 'en' ? 'English' : 'the available language'}`,
     listFirst: 'List-first + toggle',
@@ -139,7 +142,8 @@ const directoryCopy = {
     emptyDescription:
       'L’annuaire continue de grandir. Si vous connaissez une association RPN dans cette zone, aidez-nous à l’ajouter ; elle sera invitée à confirmer sa propre fiche.',
     filter: 'Filtrer',
-    languageFilter: 'Français ou anglais',
+    languageFilter: 'Langue principale',
+    languageFilters: { all: 'Toutes les langues', en: 'Anglais', fr: 'Français', fr_en: 'Français et anglais' },
     languages: { en: 'Anglais', fr: 'Français', fr_en: 'Français et anglais' },
     localizedFallback: (locale: 'en' | 'fr' | 'fr_en') => `Affiché en ${locale === 'fr' ? 'français' : locale === 'en' ? 'anglais' : 'langue disponible'}`,
     listFirst: 'Liste d’abord + bascule',
@@ -236,18 +240,42 @@ function coordinateQuery(value: string | undefined): number | null {
 }
 
 type DirectoryViewMode = 'list' | 'map' | 'split';
+type PrimaryLanguageFilter = 'all' | 'en' | 'fr' | 'fr_en';
+type ResultCardMode = 'compact' | 'detailed';
 
 function viewMode(value: string | undefined): DirectoryViewMode {
   return value === 'list' || value === 'map' || value === 'split' ? value : 'split';
 }
 
-function pageHref(params: { lat: number | null; lng: number | null; origin: string | null; page: number; query: string; radius: number; verifiedOnly: boolean; view?: DirectoryViewMode }) {
+function primaryLanguageFilter(value: string | undefined): PrimaryLanguageFilter {
+  return value === 'en' || value === 'fr' || value === 'fr_en' ? value : 'all';
+}
+
+function resultCardMode(value: string | undefined): ResultCardMode {
+  return value === 'detailed' ? value : 'compact';
+}
+
+function matchesPrimaryLanguage(association: PublicAssociationSearchResult, filter: PrimaryLanguageFilter): boolean {
+  if (filter === 'all') {
+    return true;
+  }
+
+  if (filter === 'fr_en') {
+    return association.primaryLanguage === 'fr_en';
+  }
+
+  return association.primaryLanguage === filter || association.primaryLanguage === 'fr_en';
+}
+
+function pageHref(params: { cardMode: ResultCardMode; languageFilter: PrimaryLanguageFilter; lat: number | null; lng: number | null; origin: string | null; page: number; query: string; radius: number; verifiedOnly: boolean; view?: DirectoryViewMode }) {
   return {
     pathname: '/',
     query: {
       ...(params.query.length > 0 ? { q: params.query } : {}),
       ...(params.lat !== null && params.lng !== null ? { lat: String(params.lat), lng: String(params.lng), origin: params.origin ?? 'device' } : {}),
       ...(params.verifiedOnly ? { verified: '1' } : {}),
+      ...(params.languageFilter !== 'all' ? { language: params.languageFilter } : {}),
+      ...(params.cardMode === 'detailed' ? { card: params.cardMode } : {}),
       page: String(params.page),
       radius: String(params.radius),
       ...(params.view !== undefined && params.view !== 'split' ? { view: params.view } : {})
@@ -263,12 +291,14 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
   const currentPage = numericQuery(searchParams.page, 1);
   const selectedAssociationId = searchParams.selected ?? null;
   const verifiedOnly = searchParams.verified === '1';
+  const languageFilter = primaryLanguageFilter(searchParams.language);
+  const cardMode = resultCardMode(searchParams.card);
   const view = viewMode(searchParams.view);
   const userLatitude = coordinateQuery(searchParams.lat);
   const userLongitude = coordinateQuery(searchParams.lng);
   const originLabel = userLatitude !== null && userLongitude !== null && searchParams.origin === 'device' ? copy.userLocation : null;
   const search = await searchPublicAssociations({ originLabel, query, radiusKm: radius, uiLocale: params.locale, userLatitude, userLongitude, verifiedOnly });
-  const ranked = search.results;
+  const ranked = search.results.filter((association) => matchesPrimaryLanguage(association, languageFilter));
   const locationBand = ranked.filter((association) => association.matchReason === 'location');
   const totalPages = Math.max(1, Math.ceil(ranked.length / PAGE_SIZE));
   const page = Math.min(currentPage, totalPages);
@@ -279,6 +309,8 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
     ...(query.length > 0 ? { q: query } : {}),
     ...(userLatitude !== null && userLongitude !== null ? { lat: String(userLatitude), lng: String(userLongitude), origin: searchParams.origin ?? 'device' } : {}),
     ...(verifiedOnly ? { verified: '1' } : {}),
+    ...(languageFilter !== 'all' ? { language: languageFilter } : {}),
+    ...(cardMode === 'detailed' ? { card: cardMode } : {}),
     ...(view !== 'split' ? { view } : {}),
     radius: String(radius)
   };
@@ -289,7 +321,9 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
     page: 1,
     query,
     radius,
-    verifiedOnly
+    verifiedOnly,
+    languageFilter,
+    cardMode
   };
 
   return (
@@ -300,6 +334,7 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
         <form className="grid gap-5" method="get">
           <input name="radius" type="hidden" value={radius} />
           {view !== 'split' ? <input name="view" type="hidden" value={view} /> : null}
+          {cardMode === 'detailed' ? <input name="card" type="hidden" value={cardMode} /> : null}
           {userLatitude !== null && userLongitude !== null ? (
             <>
               <input name="lat" type="hidden" value={userLatitude} />
@@ -333,9 +368,15 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
             <div className="flex flex-wrap items-center gap-3">
               <span className="font-semibold text-heading">{copy.filter}</span>
               <span className="rounded-sm border border-border bg-card px-4 py-2 text-sm text-heading shadow-card">{copy.distanceFilter(radius)}</span>
-              <button className="cursor-not-allowed rounded-sm border border-border bg-sunken px-4 py-2 text-sm text-muted shadow-card" disabled type="button">
-                {copy.languageFilter}
-              </button>
+              <label className="inline-flex items-center gap-2 rounded-sm border border-border bg-card px-4 py-2 text-sm text-heading shadow-card">
+                <span className="font-medium text-secondary">{copy.languageFilter}</span>
+                <select className="bg-transparent font-semibold text-heading outline-none" defaultValue={languageFilter} name="language">
+                  <option value="all">{copy.languageFilters.all}</option>
+                  <option value="fr">{copy.languageFilters.fr}</option>
+                  <option value="en">{copy.languageFilters.en}</option>
+                  <option value="fr_en">{copy.languageFilters.fr_en}</option>
+                </select>
+              </label>
               <label className="inline-flex items-center gap-2 text-sm font-medium text-heading">
                 <input defaultChecked={verifiedOnly} name="verified" type="checkbox" value="1" />
                 {copy.verifiedOnly}
@@ -375,10 +416,12 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
                 {copy.mapOnly}
               </Link>
               <span className="text-sm font-semibold text-secondary">{copy.resultCard}</span>
-              <span className="rounded-sm bg-sunken px-4 py-2 text-sm font-semibold text-heading shadow-card">{copy.compact}</span>
-              <button className="cursor-not-allowed rounded-sm bg-[#eef1f7] px-4 py-2 text-sm font-semibold text-muted" disabled type="button">
+              <Link className={`rounded-sm px-4 py-2 text-sm font-semibold shadow-card ${cardMode === 'compact' ? 'bg-sunken text-heading' : 'bg-[#eef1f7] text-secondary hover:text-heading'}`} href={pageHref({ ...viewBaseParams, cardMode: 'compact', page, view })}>
+                {copy.compact}
+              </Link>
+              <Link className={`rounded-sm px-4 py-2 text-sm font-semibold shadow-card ${cardMode === 'detailed' ? 'bg-sunken text-heading' : 'bg-[#eef1f7] text-secondary hover:text-heading'}`} href={pageHref({ ...viewBaseParams, cardMode: 'detailed', page, view })}>
                 {copy.detailed}
-              </button>
+              </Link>
             </div>
 
             <div className={`grid gap-8 ${view === 'split' ? 'xl:grid-cols-[1fr_0.95fr]' : ''}`}>
@@ -415,7 +458,7 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
                               </span>
                             </div>
                             <div className="space-y-2">
-                              <p className="line-clamp-2 max-w-2xl text-sm leading-6 text-secondary">{association.description ?? t('descriptionFallback')}</p>
+                              <p className={`${cardMode === 'compact' ? 'line-clamp-2' : ''} max-w-2xl text-sm leading-6 text-secondary`}>{association.description ?? t('descriptionFallback')}</p>
                               {association.description !== null && association.contentLocale !== params.locale ? (
                                 <span className="inline-flex w-fit rounded-full bg-sunken px-3 py-1 text-xs font-semibold text-muted">{copy.localizedFallback(association.contentLocale)}</span>
                               ) : null}
