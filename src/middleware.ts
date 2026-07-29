@@ -8,6 +8,11 @@ import { publicEnv } from '@/lib/env/public-env';
 const handleI18nRouting = createMiddleware(routing);
 const localeSet = new Set<string>(routing.locales);
 
+function hasLocalePrefix(pathname: string): boolean {
+  const firstSegment = pathname.split('/')[1];
+  return firstSegment !== undefined && localeSet.has(firstSegment);
+}
+
 function localeFromPath(pathname: string): Locale {
   const firstSegment = pathname.split('/')[1];
 
@@ -38,7 +43,47 @@ function localizedPath(locale: Locale, pathname: string): string {
   return `/${locale}${pathname === '/' ? '' : pathname}`;
 }
 
+function preferredLocale(request: NextRequest): Locale {
+  const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
+
+  if (cookieLocale !== undefined && localeSet.has(cookieLocale)) {
+    return cookieLocale as Locale;
+  }
+
+  const acceptedLocales = (request.headers.get('accept-language') ?? '')
+    .split(',')
+    .map((part) => {
+      const [rawTag, rawQuality] = part.trim().split(';q=');
+      const primaryTag = rawTag?.toLowerCase().split('-')[0] ?? '';
+      const quality = rawQuality === undefined ? 1 : Number.parseFloat(rawQuality);
+
+      return {
+        locale: primaryTag,
+        quality: Number.isFinite(quality) ? quality : 0
+      };
+    })
+    .sort((left, right) => right.quality - left.quality);
+
+  for (const acceptedLocale of acceptedLocales) {
+    if (localeSet.has(acceptedLocale.locale)) {
+      return acceptedLocale.locale as Locale;
+    }
+  }
+
+  return routing.defaultLocale;
+}
+
+function shouldRedirectToPreferredLocale(pathname: string): boolean {
+  return !hasLocalePrefix(pathname) && pathname !== '/sw';
+}
+
 export default async function middleware(request: NextRequest) {
+  if (shouldRedirectToPreferredLocale(request.nextUrl.pathname)) {
+    const url = request.nextUrl.clone();
+    url.pathname = localizedPath(preferredLocale(request), request.nextUrl.pathname);
+    return NextResponse.redirect(url);
+  }
+
   let response = handleI18nRouting(request);
   const locale = localeFromPath(request.nextUrl.pathname);
   const protectedPath = pathWithoutLocale(request.nextUrl.pathname);

@@ -111,6 +111,10 @@ function requesterIpHash(): string | null {
   return ip === undefined || ip.length === 0 ? null : hashSensitiveRateLimitValue(ip);
 }
 
+function botTrapFilled(formData: FormData): boolean {
+  return valueFromFormData(formData, 'website').trim().length > 0;
+}
+
 type DuplicateAssociationCandidate = {
   city: string | null;
   claim_status: string | null;
@@ -1153,6 +1157,10 @@ export async function suspendAssociation(_previousState: AssociationActionState,
 }
 
 export async function submitAssociationConnectRequest(_previousState: AssociationActionState = INITIAL_ERROR_STATE, formData: FormData): Promise<AssociationActionState> {
+  if (botTrapFilled(formData)) {
+    return { ok: true, submitted: true };
+  }
+
   const parsed = associationConnectRequestSchema.safeParse({
     associationId: valueFromFormData(formData, 'associationId'),
     locale: valueFromFormData(formData, 'locale'),
@@ -1245,6 +1253,10 @@ export async function closeConnectRequest(formData: FormData): Promise<void> {
   await updateConnectRequestStatus(formData, 'closed');
 }
 export async function submitAssociationRecruitLead(_previousState: AssociationActionState = INITIAL_ERROR_STATE, formData: FormData): Promise<AssociationActionState> {
+  if (botTrapFilled(formData)) {
+    return { ok: true, submitted: true };
+  }
+
   const parsed = associationRecruitLeadSchema.safeParse({
     associationName: valueFromFormData(formData, 'associationName'),
     city: valueFromFormData(formData, 'city'),
