@@ -6,9 +6,9 @@ import { Layers, LocateFixed, Minus, Plus } from 'lucide-react';
 import type { PublicAssociationSearchResult } from '@/features/associations/public-search';
 
 type PublicDirectoryMapCopy = {
-  areaGroup: (count: number) => string;
+  areaGroup: string;
   clusterAction: string;
-  clusterLabel: (count: number) => string;
+  clusterLabel: string;
   locationOnlyMap: string;
   mapPrecision: string;
   mapTitle: string;
@@ -112,6 +112,10 @@ function clusterAssociations(associations: PublicAssociationSearchResult[], zoom
   return [...fixedGroups, ...clusters].sort((left, right) => left.top - right.top || left.left - right.left);
 }
 
+function countLabel(template: string, count: number): string {
+  return template.replace('{count}', String(count));
+}
+
 function destinationForAssociation(locale: 'en' | 'fr', association: PublicAssociationSearchResult, pageSize: number, urlParams: Record<string, string>): string {
   const params = new URLSearchParams(urlParams);
   params.set('page', String(Math.max(1, Math.ceil(association.rank / pageSize))));
@@ -197,7 +201,7 @@ export function PublicDirectoryMap({ associations, copy, locale, pageSize, selec
 
           return (
             <button
-              aria-label={cluster.type === 'shared-area' ? copy.areaGroup(cluster.items.length) : copy.clusterLabel(cluster.items.length)}
+              aria-label={cluster.type === 'shared-area' ? countLabel(copy.areaGroup, cluster.items.length) : countLabel(copy.clusterLabel, cluster.items.length)}
               className={`absolute z-20 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 text-sm font-semibold shadow-card transition hover:scale-105 ${cluster.type === 'shared-area' ? 'size-14 border-dashed border-[#314ca8] bg-card text-[#243a93]' : 'size-12 border-[#314ca8] bg-[#4d67c7] text-white'} ${isSelected ? 'ring-4 ring-brand/40' : ''}`}
               key={cluster.id}
               onClick={() => handleClusterClick(cluster)}
@@ -215,7 +219,7 @@ export function PublicDirectoryMap({ associations, copy, locale, pageSize, selec
         <div className="absolute bottom-16 left-5 right-5 z-30 rounded-md border border-border bg-card/95 p-4 shadow-card md:left-auto md:w-80">
           <div className="flex items-center gap-2 text-sm font-semibold text-heading">
             <Layers aria-hidden="true" size={16} />
-            {openCluster.type === 'shared-area' ? copy.areaGroup(openCluster.items.length) : copy.clusterLabel(openCluster.items.length)}
+            {openCluster.type === 'shared-area' ? countLabel(copy.areaGroup, openCluster.items.length) : countLabel(copy.clusterLabel, openCluster.items.length)}
           </div>
           <div className="mt-3 grid gap-2">
             {openCluster.items.map((association) => (
