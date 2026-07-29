@@ -57,6 +57,10 @@ export function AssociationRecruitLeadForm({ city, copy, locale, searchQuery }: 
       <input name="city" type="hidden" value={city ?? ''} />
       <input name="locale" type="hidden" value={locale} />
       <input name="searchQuery" type="hidden" value={searchQuery} />
+      <div aria-hidden="true" className="sr-only">
+        <label htmlFor="recruit-website">Website</label>
+        <input autoComplete="off" id="recruit-website" name="website" tabIndex={-1} type="text" />
+      </div>
 
       <div className="flex gap-4">
         <span className="grid size-11 shrink-0 place-items-center rounded-sm bg-[#f1f4ff] text-[#3454b8]">

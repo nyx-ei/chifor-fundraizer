@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useTranslations } from 'next-intl';
 import { Mail } from 'lucide-react';
@@ -39,6 +39,10 @@ export function RequestToConnectAssociationForm({ associationId, locale }: Reque
     <form action={action} className="grid gap-5 rounded-md border border-border bg-sunken p-5">
       <input name="associationId" type="hidden" value={associationId} />
       <input name="locale" type="hidden" value={locale} />
+      <div aria-hidden="true" className="sr-only">
+        <label htmlFor="connect-website">Website</label>
+        <input autoComplete="off" id="connect-website" name="website" tabIndex={-1} type="text" />
+      </div>
       <div className="space-y-2">
         <h2 className="text-xl font-semibold text-heading">{t('title')}</h2>
         <p className="text-sm leading-6 text-secondary">{t('description')}</p>
