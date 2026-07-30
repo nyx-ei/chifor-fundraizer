@@ -78,6 +78,10 @@ function shouldRedirectToPreferredLocale(pathname: string): boolean {
 }
 
 export default async function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname === '/sw') {
+    return NextResponse.next();
+  }
+
   if (shouldRedirectToPreferredLocale(request.nextUrl.pathname)) {
     const url = request.nextUrl.clone();
     url.pathname = localizedPath(preferredLocale(request), request.nextUrl.pathname);
@@ -138,5 +142,5 @@ export default async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api|_next|.*\\..*).*)']
+  matcher: ['/((?!api|_next|sw$|.*\\..*).*)']
 };
