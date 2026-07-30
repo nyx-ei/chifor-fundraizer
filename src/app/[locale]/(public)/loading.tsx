@@ -1,5 +1,5 @@
 import { KamgaPageLoader } from '@/components/kamga/KamgaPageLoader';
 
 export default function Loading() {
-  return <KamgaPageLoader eyebrow="Annuaire RPN" label="Recherche en cours" />;
+  return <KamgaPageLoader label="Recherche en cours" />;
 }
