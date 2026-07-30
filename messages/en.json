@@ -644,6 +644,8 @@
       "contactLabel": "Admin contact",
       "contactDescription": "Contact is mediated by Kamga until the association explicitly opts in to publish a contact channel.",
       "descriptionFallback": "This association has not published a detailed description yet.",
+      "notFoundTitle": "Association profile unavailable",
+      "notFoundDescription": "This association is not currently available in the public directory. It may have been removed, suspended, or merged with another record.",
       "memberCountLabel": "Active members",
       "locationLabel": "Public location",
       "languageLabel": "Primary language",

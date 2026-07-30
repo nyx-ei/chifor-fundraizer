@@ -1,4 +1,3 @@
-import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { Building2, Languages, MapPin, ShieldCheck } from 'lucide-react';
 import { z } from 'zod';
@@ -6,31 +5,26 @@ import { z } from 'zod';
 import { RequestToConnectAssociationForm } from '@/features/associations';
 import { ASSOCIATION_CLAIM_STATUSES, ASSOCIATION_PRIMARY_LANGUAGES, ASSOCIATION_PUBLIC_PRECISIONS, ASSOCIATION_VERIFICATION_STATUSES } from '@/features/associations/association-types';
 import { Link } from '@/i18n/navigation';
-import { createSupabaseAdminClient } from '@/lib/supabase/admin';
+import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 
 const associationTableProfileSchema = z
   .object({
-    claim_status: z.enum(ASSOCIATION_CLAIM_STATUSES).catch('unclaimed'),
+    claim_status: z.enum(ASSOCIATION_CLAIM_STATUSES),
     city: z.string().nullable().catch(null),
-    common_name: z.string().nullable().catch(null),
-    common_name_en: z.string().nullable().optional().catch(null),
-    common_name_fr: z.string().nullable().optional().catch(null),
-    contact_email: z.string().nullable().catch(null),
     description: z.string().nullable().catch(null),
     description_en: z.string().nullable().optional().catch(null),
     description_fr: z.string().nullable().optional().catch(null),
+    display_name: z.string(),
+    display_name_en: z.string().nullable().catch(null),
+    display_name_fr: z.string().nullable().catch(null),
     id: z.string().uuid(),
-    name: z.string().nullable().catch(null),
-    official_name: z.string().nullable().catch(null),
-    primary_language: z.enum(ASSOCIATION_PRIMARY_LANGUAGES).catch('fr_en'),
+    primary_language: z.enum(ASSOCIATION_PRIMARY_LANGUAGES),
     province: z.string().nullable().catch(null),
-    public_contact_email: z.boolean().catch(false),
-    public_precision: z.enum(ASSOCIATION_PUBLIC_PRECISIONS).catch('neighbourhood'),
-    status: z.string(),
-    street_address: z.string().nullable().catch(null),
-    verification_status: z.enum(ASSOCIATION_VERIFICATION_STATUSES).catch('unverified')
+    public_contact_email: z.string().nullable().catch(null),
+    public_street_address: z.string().nullable().catch(null),
+    verification_status: z.enum(ASSOCIATION_VERIFICATION_STATUSES)
   })
   .passthrough();
 
@@ -65,44 +59,37 @@ async function getPublicAssociationProfile(associationId: string) {
     return null;
   }
 
-  const supabase = createSupabaseAdminClient();
+  const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
-    .from('associations')
-    .select('*')
-    .eq('id', parsedId.data)
-    .eq('status', 'active')
+    .rpc('get_public_association_profile', {
+      association_uuid: parsedId.data
+    })
     .maybeSingle();
 
-  if (error || data === null) {
-    return null;
+  if (error) {
+    throw new Error(`Association profile lookup failed: ${error.message}`);
   }
 
   const association = associationTableProfileSchema.safeParse(data);
 
-  if (!association.success || association.data.status !== 'active' || association.data.city === null || association.data.province === null) {
-    return null;
-  }
-
-  const displayName = association.data.common_name ?? association.data.official_name ?? association.data.name;
-
-  if (displayName === null) {
+  if (data === null || !association.success) {
     return null;
   }
 
   return {
     claim_status: association.data.claim_status,
-    city: association.data.city,
+    city: association.data.city ?? '',
     description: association.data.description,
     description_en: association.data.description_en ?? association.data.description,
     description_fr: association.data.description_fr ?? association.data.description,
-    display_name: displayName,
-    display_name_en: association.data.common_name_en ?? displayName,
-    display_name_fr: association.data.common_name_fr ?? displayName,
+    display_name: association.data.display_name,
+    display_name_en: association.data.display_name_en ?? association.data.display_name,
+    display_name_fr: association.data.display_name_fr ?? association.data.display_name,
     id: association.data.id,
     primary_language: association.data.primary_language,
-    province: association.data.province,
-    public_contact_email: association.data.public_contact_email ? association.data.contact_email : null,
-    public_street_address: association.data.public_precision === 'exact' ? association.data.street_address : null,
+    province: association.data.province ?? '',
+    public_contact_email: association.data.public_contact_email,
+    public_street_address: association.data.public_street_address,
     verification_status: association.data.verification_status
   };
 }
@@ -124,7 +111,21 @@ export default async function AssociationProfilePage({ params }: AssociationProf
   const association = await getPublicAssociationProfile(params.associationId);
 
   if (association === null) {
-    notFound();
+    const t = await getTranslations('associations.profile');
+
+    return (
+      <main className="min-h-screen bg-page px-6 py-10 text-body">
+        <section className="mx-auto grid max-w-3xl gap-5 rounded-md border border-border bg-card p-8 shadow-card">
+          <p className="text-xs font-semibold uppercase text-muted">{t('badge')}</p>
+          <h1 className="text-3xl font-semibold text-heading">{t('notFoundTitle')}</h1>
+          <p className="text-base leading-7 text-secondary">{t('notFoundDescription')}</p>
+          <Link className="inline-flex w-fit items-center gap-2 rounded-sm bg-brand px-4 py-2 text-sm font-semibold text-heading shadow-card" href="/">
+            <Building2 aria-hidden="true" size={16} />
+            {t('directoryAction')}
+          </Link>
+        </section>
+      </main>
+    );
   }
 
   const t = await getTranslations('associations.profile');
