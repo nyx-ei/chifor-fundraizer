@@ -14,13 +14,9 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={params.locale}>
-      <body>
-        <NextIntlClientProvider messages={messages}>
-          {children}
-          <ServiceWorkerRegistration />
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider messages={messages}>
+      {children}
+      <ServiceWorkerRegistration />
+    </NextIntlClientProvider>
   );
 }
