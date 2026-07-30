@@ -17,8 +17,8 @@ const publicAssociationSchema = z.object({
   description_en: z.string().nullable(),
   description_fr: z.string().nullable(),
   display_name: z.string(),
-  display_name_en: z.string(),
-  display_name_fr: z.string(),
+  display_name_en: z.string().nullable(),
+  display_name_fr: z.string().nullable(),
   id: z.string().uuid(),
   primary_language: z.enum(ASSOCIATION_PRIMARY_LANGUAGES),
   province: z.string(),
@@ -66,7 +66,7 @@ function localizedAssociationContent(association: z.infer<typeof publicAssociati
     description: localizedDescription ?? association.description ?? fallbackDescription,
     descriptionLocale:
       localizedDescription !== null ? locale : association.description !== null ? association.primary_language : fallbackDescription !== null ? (locale === 'fr' ? 'en' : 'fr') : locale,
-    displayName
+    displayName: displayName ?? association.display_name
   };
 }
 
@@ -81,7 +81,7 @@ export default async function AssociationProfilePage({ params }: AssociationProf
   const content = localizedAssociationContent(association, params.locale);
   const fallbackLabel =
     params.locale === 'fr'
-      ? `Affiche en ${content.descriptionLocale === 'fr' ? 'francais' : content.descriptionLocale === 'en' ? 'anglais' : 'langue disponible'}`
+      ? `Affiché en ${content.descriptionLocale === 'fr' ? 'français' : content.descriptionLocale === 'en' ? 'anglais' : 'langue disponible'}`
       : `Shown in ${content.descriptionLocale === 'fr' ? 'French' : content.descriptionLocale === 'en' ? 'English' : 'the available language'}`;
 
   return (
