@@ -4,7 +4,7 @@ import { Building2, Languages, MapPin, ShieldCheck } from 'lucide-react';
 import { z } from 'zod';
 
 import { RequestToConnectAssociationForm } from '@/features/associations';
-import { ASSOCIATION_CLAIM_STATUSES, ASSOCIATION_PRIMARY_LANGUAGES, ASSOCIATION_VERIFICATION_STATUSES } from '@/features/associations/association-types';
+import { ASSOCIATION_CLAIM_STATUSES, ASSOCIATION_PRIMARY_LANGUAGES, ASSOCIATION_PUBLIC_PRECISIONS, ASSOCIATION_VERIFICATION_STATUSES } from '@/features/associations/association-types';
 import { Link } from '@/i18n/navigation';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 
@@ -24,6 +24,28 @@ const publicAssociationSchema = z.object({
   province: z.string(),
   public_contact_email: z.string().nullable(),
   public_street_address: z.string().nullable(),
+  verification_status: z.enum(ASSOCIATION_VERIFICATION_STATUSES)
+});
+
+const associationTableProfileSchema = z.object({
+  claim_status: z.enum(ASSOCIATION_CLAIM_STATUSES),
+  city: z.string(),
+  common_name: z.string().nullable(),
+  common_name_en: z.string().nullable(),
+  common_name_fr: z.string().nullable(),
+  contact_email: z.string().nullable(),
+  description: z.string().nullable(),
+  description_en: z.string().nullable(),
+  description_fr: z.string().nullable(),
+  id: z.string().uuid(),
+  name: z.string(),
+  official_name: z.string().nullable(),
+  primary_language: z.enum(ASSOCIATION_PRIMARY_LANGUAGES),
+  province: z.string(),
+  public_contact_email: z.boolean(),
+  public_precision: z.enum(ASSOCIATION_PUBLIC_PRECISIONS),
+  status: z.literal('active'),
+  street_address: z.string().nullable(),
   verification_status: z.enum(ASSOCIATION_VERIFICATION_STATUSES)
 });
 
@@ -50,7 +72,39 @@ async function getPublicAssociationProfile(associationId: string) {
     .maybeSingle();
 
   if (error || data === null) {
-    return null;
+    const { data: associationData, error: associationError } = await supabase
+      .from('associations')
+      .select('id,name,official_name,common_name,common_name_en,common_name_fr,city,province,description,description_en,description_fr,primary_language,verification_status,claim_status,public_contact_email,contact_email,public_precision,street_address,status')
+      .eq('id', parsedId.data)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (associationError || associationData === null) {
+      return null;
+    }
+
+    const association = associationTableProfileSchema.safeParse(associationData);
+
+    if (!association.success) {
+      return null;
+    }
+
+    return {
+      claim_status: association.data.claim_status,
+      city: association.data.city,
+      description: association.data.description,
+      description_en: association.data.description_en ?? association.data.description,
+      description_fr: association.data.description_fr ?? association.data.description,
+      display_name: association.data.common_name ?? association.data.official_name ?? association.data.name,
+      display_name_en: association.data.common_name_en ?? association.data.common_name ?? association.data.official_name ?? association.data.name,
+      display_name_fr: association.data.common_name_fr ?? association.data.common_name ?? association.data.official_name ?? association.data.name,
+      id: association.data.id,
+      primary_language: association.data.primary_language,
+      province: association.data.province,
+      public_contact_email: association.data.public_contact_email ? association.data.contact_email : null,
+      public_street_address: association.data.public_precision === 'exact' ? association.data.street_address : null,
+      verification_status: association.data.verification_status
+    };
   }
 
   const parsed = publicAssociationSchema.safeParse(data);
