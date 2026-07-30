@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Layers, LocateFixed, Minus, Plus } from 'lucide-react';
 
 import type { PublicAssociationSearchResult } from '@/features/associations/public-search';
@@ -39,7 +39,11 @@ type MapCluster = {
   type: 'cluster' | 'marker' | 'shared-area';
 };
 
-function projectAssociations(associations: PublicAssociationSearchResult[]): ProjectedAssociation[] {
+function boundedPercent(value: number): number {
+  return Math.max(6, Math.min(94, value));
+}
+
+function projectAssociations(associations: PublicAssociationSearchResult[], zoom: number): ProjectedAssociation[] {
   if (associations.length === 0) {
     return [];
   }
@@ -53,8 +57,8 @@ function projectAssociations(associations: PublicAssociationSearchResult[]): Pro
 
   return associations.map((association) => ({
     ...association,
-    left: maxLon === minLon ? 50 : 12 + ((association.longitude - minLon) / (maxLon - minLon)) * 76,
-    top: maxLat === minLat ? 50 : 12 + ((maxLat - association.latitude) / (maxLat - minLat)) * 76
+    left: boundedPercent(50 + ((maxLon === minLon ? 50 : 12 + ((association.longitude - minLon) / (maxLon - minLon)) * 76) - 50) * (1 + (zoom - 2) * 0.22)),
+    top: boundedPercent(50 + ((maxLat === minLat ? 50 : 12 + ((maxLat - association.latitude) / (maxLat - minLat)) * 76) - 50) * (1 + (zoom - 2) * 0.22))
   }));
 }
 
@@ -63,7 +67,7 @@ function coordinateKey(association: PublicAssociationSearchResult): string {
 }
 
 function clusterAssociations(associations: PublicAssociationSearchResult[], zoom: number): MapCluster[] {
-  const projected = projectAssociations(associations);
+  const projected = projectAssociations(associations, zoom);
   const sharedCoordinateGroups = new Map<string, ProjectedAssociation[]>();
   const candidates: ProjectedAssociation[] = [];
 
@@ -124,6 +128,26 @@ function destinationForAssociation(locale: 'en' | 'fr', association: PublicAssoc
   return `/${locale}?${params.toString()}#association-${association.id}`;
 }
 
+function MapPinMarker({
+  children,
+  muted = false,
+  selected = false
+}: {
+  children: ReactNode;
+  muted?: boolean;
+  selected?: boolean;
+}) {
+  return (
+    <span
+      className={`grid size-11 rotate-45 place-items-center rounded-[8px] border-2 shadow-card transition ${
+        muted ? 'border-[#c6cfdf] bg-card text-[#5b6480]' : 'border-[#314ca8] bg-[#4d67c7] text-white'
+      } ${selected ? 'ring-4 ring-brand/40' : ''}`}
+    >
+      <span className="-rotate-45 text-sm font-semibold leading-none">{children}</span>
+    </span>
+  );
+}
+
 export function PublicDirectoryMap({ associations, copy, locale, pageSize, selectedAssociationId, urlParams }: PublicDirectoryMapProps) {
   const [zoom, setZoom] = useState(2);
   const [openClusterId, setOpenClusterId] = useState<string | null>(null);
@@ -141,8 +165,11 @@ export function PublicDirectoryMap({ associations, copy, locale, pageSize, selec
   }
 
   return (
-    <div className="relative min-h-[520px] overflow-hidden rounded-md border border-border bg-[#eef3fb] shadow-card">
-      <div className="absolute inset-0 bg-[linear-gradient(#dfe6f3_1px,transparent_1px),linear-gradient(90deg,#dfe6f3_1px,transparent_1px)] bg-[size:56px_56px]" />
+    <div className="relative min-h-[520px] overflow-hidden rounded-md border border-border bg-[#eef3fb] shadow-card lg:min-h-[620px]">
+      <div
+        className="absolute inset-0 bg-[linear-gradient(#dfe6f3_1px,transparent_1px),linear-gradient(90deg,#dfe6f3_1px,transparent_1px)]"
+        style={{ backgroundSize: `${Math.max(32, 62 - zoom * 8)}px ${Math.max(32, 62 - zoom * 8)}px` }}
+      />
       <div className="absolute left-5 top-5 z-10 rounded-sm border border-border bg-card/95 px-4 py-3 shadow-card">
         <p className="font-semibold text-heading">{copy.mapTitle}</p>
         <p className="mt-1 text-xs text-secondary">{copy.locationOnlyMap}</p>
@@ -189,12 +216,14 @@ export function PublicDirectoryMap({ associations, copy, locale, pageSize, selec
             return (
               <a
                 aria-label={first.displayName}
-                className={`absolute z-20 grid -translate-x-1/2 -translate-y-1/2 place-items-center text-sm font-semibold transition hover:scale-105 ${isNeighbourhood ? 'size-14 rounded-full border-2 border-dashed border-[#314ca8] bg-[#4d67c7]/20 text-[#243a93]' : 'size-11 rounded-full border-2 border-[#314ca8] bg-[#4d67c7] text-white shadow-card'} ${isSelected ? 'ring-4 ring-brand/40' : ''}`}
+                className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-105"
                 href={href}
                 key={first.id}
                 style={{ left: `${cluster.left}%`, top: `${cluster.top}%` }}
               >
-                {first.rank}
+                <MapPinMarker muted={isNeighbourhood} selected={isSelected}>
+                  {first.rank}
+                </MapPinMarker>
               </a>
             );
           }
@@ -202,14 +231,16 @@ export function PublicDirectoryMap({ associations, copy, locale, pageSize, selec
           return (
             <button
               aria-label={cluster.type === 'shared-area' ? countLabel(copy.areaGroup, cluster.items.length) : countLabel(copy.clusterLabel, cluster.items.length)}
-              className={`absolute z-20 grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 text-sm font-semibold shadow-card transition hover:scale-105 ${cluster.type === 'shared-area' ? 'size-14 border-dashed border-[#314ca8] bg-card text-[#243a93]' : 'size-12 border-[#314ca8] bg-[#4d67c7] text-white'} ${isSelected ? 'ring-4 ring-brand/40' : ''}`}
+              className="absolute z-20 -translate-x-1/2 -translate-y-1/2 transition hover:scale-105"
               key={cluster.id}
               onClick={() => handleClusterClick(cluster)}
               style={{ left: `${cluster.left}%`, top: `${cluster.top}%` }}
               title={cluster.type === 'cluster' && zoom < 4 ? copy.clusterAction : undefined}
               type="button"
             >
-              {cluster.items.length}
+              <MapPinMarker muted={cluster.type === 'shared-area'} selected={isSelected}>
+                {cluster.items.length}
+              </MapPinMarker>
             </button>
           );
         })

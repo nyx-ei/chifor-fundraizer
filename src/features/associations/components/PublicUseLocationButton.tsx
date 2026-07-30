@@ -21,6 +21,8 @@ export function PublicUseLocationButton({ label, locale, loadingLabel }: PublicU
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const params = new URLSearchParams(window.location.search);
+        params.delete('q');
+        params.delete('selected');
         params.set('lat', String(position.coords.latitude));
         params.set('lng', String(position.coords.longitude));
         params.set('origin', 'device');
