@@ -57,7 +57,7 @@ const directoryCopy = {
     areaGroup: '{count} in this area',
     clusterAction: 'Open grouped associations',
     clusterLabel: '{count} associations grouped',
-    locationOnlyMap: 'Only location-band matches are plotted. Name matches stay in the list.',
+    locationOnlyMap: 'Geocoded visible results are plotted. Public precision is respected.',
     mapLayout: 'Map layout',
     mapPrecision: 'Approximate - respects public precision',
     mapTitle: 'Approximate directory map',
@@ -151,7 +151,7 @@ const directoryCopy = {
     areaGroup: '{count} dans cette zone',
     clusterAction: 'Ouvrir les associations groupées',
     clusterLabel: '{count} associations groupées',
-    locationOnlyMap: 'Seuls les résultats de localisation sont affichés sur la carte. Les résultats par nom restent dans la liste.',
+    locationOnlyMap: 'Les résultats géocodés visibles sont affichés sur la carte. La précision publique est respectée.',
     mapLayout: 'Disposition de la carte',
     mapPrecision: 'Approximation - respecte la précision publique',
     mapTitle: 'Carte approximative de l’annuaire',
@@ -502,7 +502,7 @@ export default async function HomePage({ params, searchParams }: HomePageProps) 
 
               {view !== 'list' ? (
                 <PublicDirectoryMap
-                  associations={locationBand}
+                  associations={ranked}
                   copy={{
                     areaGroup: copy.areaGroup,
                     clusterAction: copy.clusterAction,
