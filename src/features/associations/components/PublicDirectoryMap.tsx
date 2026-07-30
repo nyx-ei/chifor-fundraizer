@@ -139,11 +139,12 @@ function MapPinMarker({
 }) {
   return (
     <span
-      className={`grid size-11 rotate-45 place-items-center rounded-[8px] border-2 shadow-card transition ${
+      className={`grid size-12 -translate-y-3 -rotate-45 place-items-center border-2 shadow-card transition ${
         muted ? 'border-[#c6cfdf] bg-card text-[#5b6480]' : 'border-[#314ca8] bg-[#4d67c7] text-white'
       } ${selected ? 'ring-4 ring-brand/40' : ''}`}
+      style={{ borderRadius: '999px 999px 999px 0' }}
     >
-      <span className="-rotate-45 text-sm font-semibold leading-none">{children}</span>
+      <span className="rotate-45 text-sm font-semibold leading-none">{children}</span>
     </span>
   );
 }
